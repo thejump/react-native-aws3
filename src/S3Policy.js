@@ -36,7 +36,7 @@ export class S3Policy {
     const policyExpiresIn = FIVE_MINUTES - timeDelta;
     const expirationDate = new Date(date.getTime() + policyExpiresIn);
 
-    const policyParams = {
+    let policyParams = {
       ...options,
       acl: options.acl || AWS_ACL,
       algorithm: AWS_ALGORITHM,
@@ -45,6 +45,10 @@ export class S3Policy {
       expirationDate: dateToString(expirationDate, 'iso8601'),
       successActionStatus: String(options.successActionStatus || DEFAULT_SUCCESS_ACTION_STATUS),
     }
+    
+     if(options.sessionToken) {
+    policyParams.sessionToken = options.sessionToken;
+  }
 
     policyParams.credential = [
       policyParams.accessKey,
@@ -63,7 +67,7 @@ export class S3Policy {
 }
 
 const formatPolicyForRequestBody = (base64EncodedPolicy, signature, options) => {
-  return {
+  let policyForRequestBody= {
     "key": options.key,
     "acl": options.acl,
     "success_action_status": options.successActionStatus,
@@ -74,10 +78,16 @@ const formatPolicyForRequestBody = (base64EncodedPolicy, signature, options) => 
     "Policy": base64EncodedPolicy,
     "X-Amz-Signature": signature,
   }
+  
+  if(options.sessionToken) {
+    policyForRequestBody['X-Amz-Security-Token'] = options.sessionToken;
+  }
+
+  return policyForRequestBody;
 }
 
 const formatPolicyForEncoding = (policy) => {
-  return {
+  let formattedPolicy= {
     "expiration": policy.expirationDate,
     "conditions": [
        {"bucket": policy.bucket},
@@ -90,6 +100,12 @@ const formatPolicyForEncoding = (policy) => {
        {"x-amz-date": policy.amzDate}
     ]
   }
+  
+  if(policy.sessionToken) {
+    formattedPolicy.conditions.push({'x-amz-security-token': policy.sessionToken});
+  }
+
+  return formattedPolicy;
 }
 
 const getEncodedPolicy = (policy) => {
